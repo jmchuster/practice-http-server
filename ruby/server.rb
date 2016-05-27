@@ -13,7 +13,15 @@ def date_imf
   Date.today.strftime('%a, %d %b %Y ') + Time.now.utc.strftime('%H:%M:%S GMT')
 end
 
-def build_request(client)
+class Request
+  attr_accessor :method
+  attr_accessor :target
+  attr_accessor :headers
+  attr_accessor :content
+end
+
+def build_request(socket)
+  Request.new
 end
 
 # e.g.
@@ -25,12 +33,18 @@ end
 #
 # OK
 class Response
-  def status_line
-    "HTTP/1.1 #{status} #{status_codes[status]}"
+  attr_accessor :status
+  attr_accessor :content
+  attr_accessor :content_type
+
+  def initialize(status: 200, content_type: 'text/plain', content: '')
+    @status = status
+    @content_type = content_type
+    @content = content
   end
 
-  def status
-    200
+  def status_line
+    "HTTP/1.1 #{status} #{status_codes[status]}"
   end
 
   def headers
@@ -38,20 +52,11 @@ class Response
       "Date" => date_imf,
       "Server" => "practice-http-server-ruby",
       "Content-Length" => content.length,
-      "Content-Type" => "text/plain"
+      "Content-Type" => content_type
     }
   end
 
-  def content
-    'OK'
-  end
-
-  def handle(request)
-    # do something with the request
-    build_response
-  end
-
-  def build_response
+  def to_string
     status_line +
       "\r\n" +
       headers.each.map { |key, value| "#{key}: #{value}\r\n" }.join +
@@ -60,16 +65,38 @@ class Response
   end
 end
 
+def handle_request(request)
+  content = <<~EOT
+    Method: #{request.method}
+    Request-target: #{request.target}
+    Headers: #{request.headers}
+    Content: #{request.content}
+  EOT
+  Response.new(content: content)
+end
+
+class HTTPVersionError < StandardError
+end
+
+class RequestParseError < StandardError
+end
+
 def start
   server = TCPServer.new 2000 # Server bind to port 2000
   puts 'Now listening on port 2000'
   loop do
-    # tpsocket
     client = server.accept    # Wait for a client to connect
-    request = build_request(client)
-    response = Response.new.handle(request)
-    client.puts response
-    client.close
+    begin
+      request = build_request(client)
+      response = handle_request(request)
+      client.puts response.to_string
+    rescue HTTPVersionError
+      client.puts Response.new(status: 505).to_string
+    rescue RequestParseError
+      client.puts Response.new(status: 400).to_string
+    ensure
+      client.close
+    end
   end
 end
 
