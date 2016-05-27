@@ -13,15 +13,20 @@ require 'errors'
 VALID_METHODS = ['GET', 'HEAD']
 
 def echo_request(request)
-  return Response.new if request.method == 'HEAD'
-
   content = <<~EOT
     Method: #{request.method}
     Request-target: #{request.target}
     Headers: #{request.headers.pretty_inspect}
     Content: #{request.content}
   EOT
-  Response.new(content: content)
+  TextResponse.new(content: content)
+end
+
+def serve_assets(asset_path)
+  file_path = '.'  + asset_path
+  raise FileNotFoundError if !File.exists?(file_path) or File.directory?(file_path)
+  file = File.new(file_path)
+  FileResponse.new(file: file)
 end
 
 def start
@@ -31,12 +36,22 @@ def start
     client = server.accept    # Wait for a client to connect
     begin
       request = Request.from_socket(client)
-      response = echo_request(request)
-      client.puts response.to_string
+
+      if request.method == 'HEAD'
+        response = Response.new
+      elsif request.target.start_with? '/assets'
+        response = serve_assets(request.target)
+      else
+        response = echo_request(request)
+      end
+
+      response.to_socket(client)
     rescue HTTPVersionError
-      client.puts Response.new(status: 505).to_string
+      Response.new(status: 505).to_socket(client)
     rescue RequestParseError
-      client.puts Response.new(status: 400).to_string
+      Response.new(status: 400).to_socket(client)
+    rescue FileNotFoundError
+      Response.new(status: 404).to_socket(client)
     ensure
       client.close
     end

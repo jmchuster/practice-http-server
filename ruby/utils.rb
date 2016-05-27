@@ -11,7 +11,7 @@ module Utils
     {
       200 => 'OK',
       400 => 'Bad Request',
-      404 => 'Not Founder',
+      404 => 'Not Found',
       505 => 'HTTP Version Not Supported'
     }
 

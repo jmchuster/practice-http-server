@@ -11,30 +11,72 @@ class Response
   attr_accessor :content
   attr_accessor :content_type
 
-  def initialize(status: 200, content_type: 'text/plain', content: '')
+  def initialize(status: 200)
     @status = status
-    @content_type = content_type
-    @content = content
   end
 
   def status_line
     "HTTP/1.1 #{status} #{Utils::STATUS_CODES[status]}"
   end
 
+  def content_length
+    0
+  end
+
   def headers
     {
       "Date" => Utils::date_imf,
       "Server" => "practice-http-server-ruby",
-      "Content-Length" => content.length,
-      "Content-Type" => content_type
+      "Content-Length" => content_length
     }
   end
 
-  def to_string
-    status_line +
-      "\r\n" +
-      headers.each.map { |key, value| "#{key}: #{value}\r\n" }.join +
-      "\r\n" +
-      content
+  def to_socket(socket)
+    socket.puts status_line +
+                "\r\n" +
+                headers.each.map { |key, value| "#{key}: #{value}\r\n" }.join +
+                "\r\n"
+  end
+end
+
+class TextResponse < Response
+  def initialize(status: 200, content_type: 'text/plain', content: '')
+    super(status: status)
+    @content_type = content_type
+    @content = content
+  end
+
+  def content_length
+    content.length
+  end
+
+  def headers
+    super.merge({ "Content-Type" => content_type })
+  end
+
+  def to_socket(socket)
+    super
+    socket.puts content
+  end
+end
+
+class FileResponse < Response
+  def initialize(status: 200, content_type: 'application/octet-stream', file: nil)
+    super(status: status)
+    @content_type = content_type
+    @file = file
+  end
+
+  def content_length
+    @file.size
+  end
+
+  def headers
+    super.merge({ "Content-Type" => content_type })
+  end
+
+  def to_socket(socket)
+    super
+    IO.copy_stream(@file, socket, content_length)
   end
 end
