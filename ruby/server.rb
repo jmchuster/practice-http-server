@@ -38,41 +38,44 @@ class Request
 end
 
 # http://httpwg.org/specs/rfc7230.html#rule.token.separators
-def split_header_value(value_str)
-  token = Regexp.escape("!#$%&'*+-.^_`|~") + '0-9A-Za-z'
-  dquoted = /.*?[^\\]/.source
-  value_str.scan(/"(#{dquoted})"|([#{token}]+)/).flatten.compact
-end
+# def split_header_value(value_str)
+#   token = Regexp.escape("!#$%&'*+-.^_`|~") + '0-9A-Za-z'
+#   dquoted = /.*?[^\\]/.source
+#   value_str.scan(/"(#{dquoted})"|([#{token}]+)/).flatten.compact
+# end
 
 def build_request(socket)
-  begin
-    request_line = socket.gets
-    method, target, http_version = request_line.split
-    raise HTTPVersionError if http_version != 'HTTP/1.1'
-    raise RequestParseError if !VALID_METHODS.include?(method)
+  request_line = socket.gets
+  method, target, http_version = request_line.split
+  raise HTTPVersionError if http_version != 'HTTP/1.1'
+  raise RequestParseError if !VALID_METHODS.include?(method)
 
-    headers = {}
-    byebug
-    while request_line = socket.gets and request_line != "\r\n"
-      key, value_str = request_line.split(':', 2)
-      headers[key.upcase] ||= []
-      headers[key.upcase].concat(split_header_value(value_str))
+  headers = {}
+  byebug
+  while request_line = socket.gets and request_line != "\r\n"
+    key, value = request_line.split(':', 2)
+
+    previous_headers = headers[key.upcase]
+    if previous_headers
+      headers[key.upcase] = [*previous_headers] << value.strip
+    else
+      headers[key.upcase] = value.strip
     end
-
-    if headers['CONTENT-LENGTH']
-      content = socket.read(headers['CONTENT-LENGTH'])
-    end
-
-    Request.new(
-      method: method,
-      target: target,
-      headers: headers,
-      content: content
-    )
-  rescue => e
-    LOGGER.error e
-    raise RequestParseError
   end
+
+  if headers['CONTENT-LENGTH']
+    content = socket.read(headers['CONTENT-LENGTH'])
+  end
+
+  Request.new(
+    method: method,
+    target: target,
+    headers: headers,
+    content: content
+  )
+rescue => e
+  LOGGER.error e
+  raise RequestParseError
 end
 
 # e.g.
