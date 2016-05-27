@@ -31,7 +31,7 @@ server response
 
 TODO:
 
-[ ] Version 1
+[X] Version 1
 - read in request of type HEAD, GET
 - echo
   - method
