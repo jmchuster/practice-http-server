@@ -16,4 +16,9 @@ module Utils
     }
 
   LOGGER = Logger.new(STDOUT)
+
+  MIME_TYPES = File.readlines('mime.types')
+                  .select { |line| !(line[0].start_with?('#') || /\A[[:space:]]*\z/ === line) }
+                  .map { |line| line.split }
+                  .inject({}) { |memo, obj| obj[1..-1].each { |ext| memo[ext] = obj[0] }; memo }
 end

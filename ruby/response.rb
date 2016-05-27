@@ -40,9 +40,9 @@ class Response
 end
 
 class TextResponse < Response
-  def initialize(status: 200, content_type: 'text/plain', content: '')
+  def initialize(status: 200, content_type: nil, content:)
     super(status: status)
-    @content_type = content_type
+    @content_type = content_type ||  'text/plain'
     @content = content
   end
 
@@ -61,9 +61,9 @@ class TextResponse < Response
 end
 
 class FileResponse < Response
-  def initialize(status: 200, content_type: 'application/octet-stream', file: nil)
+  def initialize(status: 200, content_type: nil, file:)
     super(status: status)
-    @content_type = content_type
+    @content_type = Utils::MIME_TYPES[File.extname(file)[1..-1]] || 'application/octet-stream'
     @file = file
   end
 
